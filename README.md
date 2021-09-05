@@ -55,10 +55,10 @@ Running with
 ```
 
 Output
-```c
+```cmd
 
-   //Hello world! I'm process 0 out of 4 processes.
-   //Hello world! I'm process 1 out of 4 processes.
+   Hello world! I'm process 0 out of 4 processes.
+   Hello world! I'm process 1 out of 4 processes.
 
 ```
 
@@ -68,10 +68,10 @@ Running with
 ```
 
 Output
-```c
+```cmd
 
-   //Hello world! I'm process 0 out of 4 processes.
-   //Hello world! I'm process 1 out of 4 processes.
-   //Hello world! I'm process 2 out of 4 processes.
-   //Hello world! I'm process 3 out of 4 processes.
+   Hello world! I'm process 0 out of 4 processes.
+   Hello world! I'm process 1 out of 4 processes.
+   Hello world! I'm process 2 out of 4 processes.
+   Hello world! I'm process 3 out of 4 processes.
 ```
