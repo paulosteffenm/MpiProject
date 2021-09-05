@@ -60,8 +60,8 @@ Running with
 Output
 ```cmd
 
-   Hello world! I'm process 0 out of 4 processes.
-   Hello world! I'm process 1 out of 4 processes.
+   Hello world! I'm process 0 out of 2 processes.
+   Hello world! I'm process 1 out of 2 processes.
 
 ```
 
