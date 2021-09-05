@@ -1,4 +1,7 @@
 # MpiProject
+This is a small project to test the mpi.h
+
+Message Passing Interface (MPI)
 
 # Build Setup
 ```bash
