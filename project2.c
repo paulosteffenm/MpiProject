@@ -25,6 +25,7 @@ int subNumbers(int array[])
 
 int main(int argc, char **argv)
 {
+
   int ierr, numProcs, myId;
 
   int array[5] = {1, 2, 3, 4, 5};
@@ -43,7 +44,7 @@ int main(int argc, char **argv)
   else
   {
     subArray = subNumbers(array);
-    printf("Sub: %d", subArray);
+    printf("Sub: %d\n", subArray);
   }
 
   ierr = MPI_Finalize();
