@@ -1,139 +1,152 @@
-
-/* este programa soma todas linhas de um array. O processo principal
-    manda uma parte deste array para os processos escravos que deve retornar
-    a soma da sua porção.
-   */
-
-#include <stdio.h>
+//#include <mpi.h>
 #include </usr/include/mpi/mpi.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 #include <sys/time.h>
 
-#define max_rows 100000
+#define maximoDeLinhas 100000
 #define send_data_tag 2001
 #define return_data_tag 2002
 
-int array[max_rows];
-int array2[max_rows];
+// Temporary array for slave process
+int array[maximoDeLinhas];
+int array2[maximoDeLinhas];
 
-main(int argc, char **argv)
+int main(int argc, char *argv[])
 {
-  int sum, partial_sum;
-  MPI_Status status;
-  int myId, rootProcess, ierr, i, numLinhas, numProcs,
-      outroId, numLinhasReceber, mediaLinhasProcessos,
-      sender, numLinhasRcv, linhaInicio, linhaFim, numLinhasSend;
 
-  // desta linha para baixo repete o programa para cada processo
+    int idProcesso, numeroDeProcessos,
+        linhasPorProcesso,
+        qtdeRecebida, numLinhas;
 
-  ierr = MPI_Init(&argc, &argv);
+    MPI_Status status;
 
-  rootProcess = 0;
+    MPI_Init(&argc, &argv);
 
-  /*retorna o numero do processo e o numero total de processos*/
+    MPI_Comm_rank(MPI_COMM_WORLD, &idProcesso);
+    MPI_Comm_size(MPI_COMM_WORLD, &numeroDeProcessos);
 
-  ierr = MPI_Comm_rank(MPI_COMM_WORLD, &myId);
-  ierr = MPI_Comm_size(MPI_COMM_WORLD, &numProcs);
-
-  if (myId == rootProcess)
-  {
-    struct timeval t1, t2;
-    double elapsedTime;
-    gettimeofday(&t1, NULL);
-    // quando o processo for 0 deve ser o principal, entao deve separar o array
-
-    printf("Entre com o numero de numeros: \n");
-    scanf("%d", &numLinhas);
-
-    if (numLinhas > max_rows)
+    // VERIFICA SE É O PROCESSO PRINCIPAL
+    if (idProcesso == 0)
     {
-      printf("Muitos numeros\n");
-      exit(1);
+        struct timeval t1, t2;
+        double elapsedTime;
+        gettimeofday(&t1, NULL);
+
+        printf("Digite o numero de linhas a serem somadas: \n");
+        scanf("%d", &numLinhas);
+
+        // PREENCHENDO O ARRAY COM VALORES GERADOS A PARTIR DE UM I QUE SE SOMA EM LOOP
+        int i;
+        for (i = 0; i < numLinhas; i++)
+        {
+            array[i] = i + 1;
+        }
+
+        // ADICIONANDO UM LIMITE PARA A QUANTIADE DE LINHAS DO PROCESSO
+        if (numLinhas > maximoDeLinhas)
+        {
+            printf("Quantidade de linhas excede o limite\n");
+            exit(1);
+        }
+
+        int index, j;
+        // SEPARANDO UMA QUANTIDADE DE LINHAS A SER DIVIDIDA PARA CADA PROCESSO
+        linhasPorProcesso = numLinhas / numeroDeProcessos;
+
+        // SE A QUANTIDADE DE PROCESSOS FOR MAIOR QUE 1 UTILIZA-SE DOS PROCESSOS SECUNDARIOS PARA REALIZAR SOMAS PARCIAIS
+        if (numeroDeProcessos > 1)
+        {
+            // DECLARAÇÃO DA VARIAVEL J E AQUI PARA CADA LOOP DO FOR ELA ASSUME O VALOR QUE SERIA CORRESPONTE A UM ID DE UM PROCESSO
+            for (j = 1; j < numeroDeProcessos - 1; j++)
+            {
+                index = j * linhasPorProcesso;
+
+                // ENVIANDO A QUANTIDADE DE LINHAS QUE CADA PROCESSO FICA RESPONSÁVEL
+                MPI_Send(&linhasPorProcesso,
+                         1, MPI_INT, j, 0,
+                         MPI_COMM_WORLD);
+                // ENVIANDO A PARTIR DE QUAL POSIÇÃO O PROCESSO DEVE COMEÇAR A SOMAR
+                MPI_Send(&array[index],
+                         linhasPorProcesso,
+                         MPI_INT, j, 0,
+                         MPI_COMM_WORLD);
+            }
+
+            // O ÚLTIMO PROCESSO CUIDA DOS ULTIMOS ELEMENTOS DO ARRAY
+            index = j * linhasPorProcesso;
+            int linhasSobrando = numLinhas - index;
+
+            // ENVIANDO A QUANTIDADE DE LINHAS QUE SOBRAM PARA O PROCESSO SABER A QUANTIDADE A QUAL FICOU RESPONSAVEL
+            MPI_Send(&linhasSobrando,
+                     1, MPI_INT,
+                     j, 0,
+                     MPI_COMM_WORLD);
+            // ENVIANDO OS ULTIMOS ELEMENTOS
+            MPI_Send(&array[index],
+                     linhasSobrando,
+                     MPI_INT, j, 0,
+                     MPI_COMM_WORLD);
+        }
+
+        // SOMANDO AS PRIMEIRAS LINHAS DO ARRAY QUE O PROCESSO ROOT FICOU RESPONSAVEL
+        int soma = 0;
+        for (i = 0; i < linhasPorProcesso; i++)
+            soma += array[i];
+
+        printf("O processo principal somou: %d\n", soma);
+
+
+        // SOMANDO AS SOMAS PARCIAIS RECEBIDAS DOS OUTROS PROCESSOS
+        int somaParcial;
+        for (i = 1; i < numeroDeProcessos; i++)
+        {
+            // RECEBE A QUANTIDADE
+            MPI_Recv(&somaParcial, 1, MPI_INT,
+                     MPI_ANY_SOURCE, 0,
+                     MPI_COMM_WORLD,
+                     &status);
+            // ATRIBUINDO DE QUAL PROCESSO ESSA SOMA VEM
+            int sender = status.MPI_SOURCE;
+
+            printf("O processo %d enviou a soma pracial de: %d\n", sender, somaParcial);
+
+            soma += somaParcial;
+        }
+
+        printf("Soma total: %d\n", soma);
+        gettimeofday(&t2, NULL);
+        elapsedTime = (t2.tv_sec - t1.tv_sec) * 1000.0;    // sec to ms
+        elapsedTime += (t2.tv_usec - t1.tv_usec) / 1000.0; // us to ms
+        printf("tempo para ser executado: %f ms.\n", elapsedTime);
+    }
+    // PROCESSOS "SECUNDARIOS"
+    else
+    {
+        // RECEBE A QUANTIDADE DE LINHAS QUE ESSE PROCESSO FICA RESPONSAVEL
+        MPI_Recv(&qtdeRecebida,
+                 1, MPI_INT, 0, 0,
+                 MPI_COMM_WORLD,
+                 &status);
+
+        // RECEBE O ARRAY SECUNDARIO QUE É USADO PARA ARMAZENAR OS RESULTADOS TEMPORARIAMENTE
+        MPI_Recv(&array2, qtdeRecebida,
+                 MPI_INT, 0, 0,
+                 MPI_COMM_WORLD,
+                 &status);
+
+        // SOMANDO COM BASE NA QUANTIDADE DE LINHAS RECEBIDAS E NO ARRAY TEMPORARIO RECEBIDO
+        int somaParcial = 0;
+        for (int i = 0; i < qtdeRecebida; i++)
+            somaParcial += array2[i];
+
+        // DEVOLVENDO A SOMA PARCIAL PARA O PROCESSO PRINCIPAL
+        MPI_Send(&somaParcial, 1, MPI_INT,
+                 0, 0, MPI_COMM_WORLD);
     }
 
-    mediaLinhasProcessos = numLinhas / numProcs;
+    MPI_Finalize();
 
-    for (i = 0; i < numLinhas; i++)
-    {
-      array[i] = i + 1;
-    }
-
-    /* distribui um pouco do array para cada processo */
-
-    for (outroId = 1; outroId < numProcs; outroId++)
-    {
-      linhaInicio = outroId * mediaLinhasProcessos + 1;
-      linhaFim = (outroId + 1) * mediaLinhasProcessos;
-
-      if ((numLinhas - linhaFim) < mediaLinhasProcessos)
-      {
-        linhaFim = numLinhas - 1;
-      }
-
-      numLinhasSend = linhaFim - linhaInicio + 1;
-
-      ierr = MPI_Send(&numLinhasSend, 1, MPI_INT,
-                      outroId, send_data_tag, MPI_COMM_WORLD);
-
-      ierr = MPI_Send(&array[linhaInicio], numLinhasSend, MPI_INT,
-                      outroId, send_data_tag, MPI_COMM_WORLD);
-    }
-
-    // realiza a soma dos numeros do processo principal
-
-    sum = 0;
-    for (i = 0; i < mediaLinhasProcessos + 1; i++)
-    {
-      sum += array[i];
-    }
-
-    printf("Soma calculada pelo processo principal: %d \n", sum);
-
-    // recebe a soma dos processos escravos e soma na soma principal
-
-    for (outroId = 1; outroId < numProcs; outroId++)
-    {
-
-      ierr = MPI_Recv(&partial_sum, 1, MPI_LONG, MPI_ANY_SOURCE,
-                      return_data_tag, MPI_COMM_WORLD, &status);
-
-      sender = status.MPI_SOURCE;
-
-      printf("soma parcial %d retornado do processo %d\n", partial_sum, sender);
-
-      sum += partial_sum;
-    }
-
-    printf("O total eh: %i\n", sum);
-    gettimeofday(&t2, NULL);
-    elapsedTime = (t2.tv_sec - t1.tv_sec) * 1000.0;    // sec to ms
-    elapsedTime += (t2.tv_usec - t1.tv_usec) / 1000.0; // us to ms
-    printf("%f ms.\n", elapsedTime);
-  }
-
-  else
-  {
-
-    // provavelmente um processo escravo, deve receber uma parte do array e retornar a soma
-
-    ierr = MPI_Recv(&numLinhasReceber, 1, MPI_INT,
-                    rootProcess, send_data_tag, MPI_COMM_WORLD, &status);
-
-    ierr = MPI_Recv(&array2, numLinhasReceber, MPI_INT,
-                    rootProcess, send_data_tag, MPI_COMM_WORLD, &status);
-
-    numLinhasRcv = numLinhasReceber;
-
-    partial_sum = 0;
-    for (i = 0; i < numLinhasRcv; i++)
-    {
-      partial_sum += array2[i];
-    }
-
-    //manda a soma parcial para o processo principal
-
-    ierr = MPI_Send(&partial_sum, 1, MPI_LONG, rootProcess,
-                    return_data_tag, MPI_COMM_WORLD);
-  }
-  ierr = MPI_Finalize();
-  return 0;
+    return 0;
 }
