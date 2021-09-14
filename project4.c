@@ -9,7 +9,6 @@
 #define send_data_tag 2001
 #define return_data_tag 2002
 
-// Temporary array for slave process
 int array[maximoDeLinhas];
 int array2[maximoDeLinhas];
 
